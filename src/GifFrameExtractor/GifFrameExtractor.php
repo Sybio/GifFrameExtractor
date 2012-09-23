@@ -3,7 +3,7 @@
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version 1.0
+ * @version 1.1
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -65,12 +65,12 @@ class GifFrameExtractor
     /**
      * @var integer
      */
-    private $gifWidth;
+    private $gifMaxWidth;
     
     /**
      * @var integer
      */
-    private $gifHeight;
+    private $gifMaxHeight;
     
     /**
      * @var integer
@@ -101,7 +101,7 @@ class GifFrameExtractor
      * @param boolean $originalFrames Get original frames (with transparent background)
      */
     public function extract($filename, $originalFrames = false)
-    {
+    { 
         $this->reset();
         $this->parseFramesInfo($filename);
         
@@ -112,12 +112,24 @@ class GifFrameExtractor
             
             $img = imagecreatefromstring($this->fileHeader["gifheader"].$this->frameSources[$i]["graphicsextension"].$this->frameSources[$i]["imagedata"].chr(0x3b));
             
-            if (!$originalFrames && $i > 0) {
+            if (!$originalFrames) {
                 
-                $tmpImg = imagecreate($this->gifWidth, $this->gifHeight);
-                imagecopy($tmpImg, $this->frames[0]['image'], 0, 0, 0, 0, $this->gifWidth, $this->gifHeight);
-                imagecopy($tmpImg, $img, 0, 0, 0, 0, $this->gifWidth, $this->gifHeight);
-                $img = $tmpImg;
+                $sprite = imagecreatetruecolor($this->gifMaxWidth, $this->gifMaxHeight);	
+                $trans = imagecolortransparent($sprite);
+                imagealphablending($sprite, false);
+                imagesavealpha($sprite, true);
+                imagepalettecopy($sprite, $img);		
+                			
+                imagefill($sprite, 0, 0, imagecolortransparent($img));
+                imagecolortransparent($sprite, imagecolortransparent($img));	
+                
+                if ($i > 0) {
+                    
+                    imagecopy($sprite, $this->frames[$i - 1]['image'], 0, 0, -$this->frameSources[$i - 1]["offset_left"], -$this->frameSources[$i - 1]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
+                }
+                
+                imagecopy($sprite, $img, 0, 0, -$this->frameSources[$i]["offset_left"], -$this->frameSources[$i]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
+                $img = $sprite;
             }
             
             $this->frameImages[$i] = $this->frames[$i]['image'] = $img;
@@ -337,6 +349,18 @@ class GifFrameExtractor
         $this->orgvars[$this->frameNumber]["disposal_method"] = $this->frameSources[$this->frameNumber]["disposal_method"];
         $this->orgvars[$this->frameNumber]["offset_left"] = $this->frameSources[$this->frameNumber]["offset_left"];
         $this->orgvars[$this->frameNumber]["offset_top"] = $this->frameSources[$this->frameNumber]["offset_top"];
+        
+        // Updating the max width
+        if ($this->gifMaxWidth < $this->frameSources[$this->frameNumber]["width"]) {
+            
+            $this->gifMaxWidth = $this->frameSources[$this->frameNumber]["width"];
+        }
+        
+        // Updating the max height
+        if ($this->gifMaxHeight < $this->frameSources[$this->frameNumber]["height"]) {
+            
+            $this->gifMaxHeight = $this->frameSources[$this->frameNumber]["height"];
+        }
     }
     
     /**
@@ -565,7 +589,7 @@ class GifFrameExtractor
     private function reset()
     {
         $this->gif = null;
-        $this->gifHeight = $this->gifWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
+        $this->gifMaxHeight = $this->gifMaxWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
         $this->frameImages = $this->frameDurations = $this->globaldata = $this->orgvars = $this->frames = $this->fileHeader = $this->frameSources = array();
     }
     
