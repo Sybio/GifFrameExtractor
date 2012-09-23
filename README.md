@@ -2,11 +2,11 @@
 # GifFrameExtractor
 # ================================
 
-GifFrameExtractor is a PHP class that separe all the frames (and their duration) of an animated GIF
+GifFrameExtractor is a PHP class that separates all the frames (and their duration) of an animated GIF
 
 ### For what ?
 
-The class helps you to separe all the frames of an animated GIF, for example to watermark them and then to
+The class helps you to separate all the frames of an animated GIF, for example to watermark them and then to
 generate a new watermarked and animated GIF.
 
 ### Usage
