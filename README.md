@@ -13,14 +13,14 @@ generate a new watermarked and animated GIF.
 
 GifFrameExtractor is really easy to use:
 
-*** 1 - Extraction: ***
+** 1 - Extraction: **
 
 ```php
 $gfe = new GifFrameExtractor();
 $gfe->extract('path/images/picture.gif');
 ```
 
-*** 2 - Getting the frames and their duration: ***
+** 2 - Getting the frames and their duration: **
 
 ```php
 foreach ($gfe->getFrames() as $frame) {
@@ -33,14 +33,14 @@ foreach ($gfe->getFrames() as $frame) {
 }
 ```
 
-You can also get separtly an array of images and an array of durations:
+You can also get separately an array of images and an array of durations:
 
 ```php
 $frameImages = $gfe->getFrameImages();
 $frameDurations = $gfe->getFrameDurations();
 ```
 
-*** Option: ***
+** Option: **
 
 You can choose if you want to get the original frames (with transparency background) or frames pasted on the first one
 with the second parameter of extract() method:
