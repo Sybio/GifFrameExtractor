@@ -14,8 +14,25 @@ class GifFrameExtractor
     // Properties
     // ===================================================================================
     
+    /**
+     * @var resource
+     */
     private $gif;
+    
+    /**
+     * @var array
+     */
     private $frames;
+    
+    /**
+     * @var integer (old: index)
+     */
+    private $frameNumber;
+    
+    /**
+     * @var array (old: imagedata)
+     */
+    private $frameSources;
     
     // Methods
     // ===================================================================================
@@ -27,6 +44,8 @@ class GifFrameExtractor
     {
         $this->gif = null;
         $this->frames = array();
+        $this->frameNumber = 0;
+        $this->frameSources = array();
     }
     
     /**
@@ -45,6 +64,56 @@ class GifFrameExtractor
     // ===================================================================================
     
     /**
+     * Parse frame data (old: parse_image_data)
+     */
+    private function parseFrameData()
+    {
+        $this->frameSources[$this->frameNumber]["disposal_method"] = $this->getImageDataBit("ext", 3, 3, 3);
+        $this->frameSources[$this->frameNumber]["user_input_flag"] = $this->getImageDataBit("ext", 3, 6, 1);
+        $this->frameSources[$this->frameNumber]["transparent_color_flag"] = $this->getImageDataBit("ext", 3, 7, 1);
+        $this->frameSources[$this->frameNumber]["delay_time"] = $this->dualByteVal($this->getImageDataByte("ext", 4, 2));
+        $this->frameSources[$this->frameNumber]["transparent_color_index"] = ord($this->getImageDataByte("ext", 6, 1));
+        $this->frameSources[$this->frameNumber]["offset_left"] = $this->dualByteVal($this->getImageDataByte("dat", 1, 2));
+        $this->frameSources[$this->frameNumber]["offset_top"] = $this->dualByteVal($this->getImageDataByte("dat", 3, 2));
+        $this->frameSources[$this->frameNumber]["width"] = $this->dualByteVal($this->getImageDataByte("dat", 5, 2));
+        $this->frameSources[$this->frameNumber]["height"] = $this->dualByteVal($this->getImageDataByte("dat", 7, 2));
+        $this->frameSources[$this->frameNumber]["local_color_table_flag"] = $this->getImageDataBit("dat", 9, 0, 1);
+        $this->frameSources[$this->frameNumber]["interlace_flag"] = $this->getImageDataBit("dat", 9, 1, 1);
+        $this->frameSources[$this->frameNumber]["sort_flag"] = $this->getImageDataBit("dat", 9, 2, 1);
+        $this->frameSources[$this->frameNumber]["color_table_size"] = pow(2, $this->getImageDataBit("dat", 9, 5, 3) + 1) * 3;
+        $this->frameSources[$this->frameNumber]["color_table"] = substr($this->frameSources[$this->frameNumber]["imagedata"], 10, $this->frameSources[$this->frameNumber]["color_table_size"]);
+        $this->frameSources[$this->frameNumber]["lzw_code_size"] = ord($this->getImageDataByte("dat", 10, 1));
+        
+        // Decoding
+        $this->orgvars[$this->frameNumber]["transparent_color_flag"] = $this->frameSources[$this->frameNumber]["transparent_color_flag"];
+        $this->orgvars[$this->frameNumber]["transparent_color_index"] = $this->frameSources[$this->frameNumber]["transparent_color_index"];
+        $this->orgvars[$this->frameNumber]["delay_time"] = $this->frameSources[$this->frameNumber]["delay_time"];
+        $this->orgvars[$this->frameNumber]["disposal_method"] = $this->frameSources[$this->frameNumber]["disposal_method"];
+        $this->orgvars[$this->frameNumber]["offset_left"] = $this->frameSources[$this->frameNumber]["offset_left"];
+        $this->orgvars[$this->frameNumber]["offset_top"] = $this->frameSources[$this->frameNumber]["offset_top"];
+    }
+    
+    /**
+     * Get the image data byte (old: getImageDataByte)
+     * 
+     * @param string $type
+     * @param integer $start
+     * @param integer $length
+     * 
+     * @return string
+     */
+    private function getImageDataByte($type, $start, $length)
+    {
+        if ($type == "ext") {
+            
+            return substr($this->frameSources[$this->frameNumber]["graphicsextension"], $start, $length);
+        }
+        
+        // "dat"
+        return substr($this->frameSources[$this->frameNumber]["imagedata"], $start, $length);
+    }
+    
+    /**
      * Get the image data bit
      * 
      * @param string $type
@@ -58,15 +127,15 @@ class GifFrameExtractor
     {
         if ($type == "ext") {
             
-            return $this->readBits(ord(substr($this->imagedata[$this->index]["graphicsextension"], $byteIndex, 1)), $bitStart, $bitLength);
+            return $this->readBits(ord(substr($this->frameSources[$this->frameNumber]["graphicsextension"], $byteIndex, 1)), $bitStart, $bitLength);
         } 
         
         // "dat"
-        return $this->readBits(ord(substr($this->imagedata[$this->index]["imagedata"], $byteIndex, 1)), $bitStart, $bitLength);
+        return $this->readBits(ord(substr($this->frameSources[$this->frameNumber]["imagedata"], $byteIndex, 1)), $bitStart, $bitLength);
     }
     
     /**
-     * Return the value of 2 ASCII chars
+     * Return the value of 2 ASCII chars (old: dualByteVal)
      * 
      * @param string $s
      * 
