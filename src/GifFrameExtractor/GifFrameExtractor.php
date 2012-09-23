@@ -3,7 +3,7 @@
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version Under development
+ * @version 1.0
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -25,46 +25,292 @@ class GifFrameExtractor
     private $frames;
     
     /**
-     * @var integer (old: index)
+     * @var array
+     */
+    private $frameDurations;
+    
+    /**
+     * @var array
+     */
+    private $frameImages;
+    
+    /**
+     * @var integer 
+     * 
+     * (old: $this->index)
      */
     private $frameNumber;
     
     /**
-     * @var array (old: imagedata)
+     * @var array 
+     * 
+     * (old: $this->imagedata)
      */
     private $frameSources;
+    
+    /**
+     * @var array 
+     * 
+     * (old: $this->fileHeader)
+     */
+    private $fileHeader;
+    
+    /**
+     * @var integer The reader pointer in the file source 
+     * 
+     * (old: $this->pointer)
+     */
+    private $pointer;
+    
+    /**
+     * @var integer
+     */
+    private $gifWidth;
+    
+    /**
+     * @var integer
+     */
+    private $gifHeight;
+    
+    /**
+     * @var integer
+     */
+    private $handle;
+    
+    /**
+     * @var array 
+     * 
+     * (old: globaldata)
+     */
+    private $globaldata;
+    
+    /**
+     * @var array 
+     * 
+     * (old: orgvars)
+     */
+    private $orgvars;
     
     // Methods
     // ===================================================================================
     
     /**
-     * Constructor
-     */
-    public function __construct()
-    {
-        $this->gif = null;
-        $this->frames = array();
-        $this->frameNumber = 0;
-        $this->frameSources = array();
-    }
-    
-    /**
      * Extract frames of a GIF
      * 
      * @param string $filename GIF filename path
+     * @param boolean $originalFrames Get original frames (with transparent background)
      */
-    public function extract($filename)
+    public function extract($filename, $originalFrames = false)
     {
-        $this->gif = imagecreatefromgif($filename);
+        $this->reset();
+        $this->parseFramesInfo($filename);
         
-        var_dump(imagegif($this->gif)); exit;
+        for ($i = 0; $i < count($this->frameSources); $i++) {
+            
+            $this->frames[$i] = array();
+            $this->frameDurations[$i] = $this->frames[$i]['duration'] = $this->frameSources[$i]['delay_time'];
+            
+            $img = imagecreatefromstring($this->fileHeader["gifheader"].$this->frameSources[$i]["graphicsextension"].$this->frameSources[$i]["imagedata"].chr(0x3b));
+            
+            if (!$originalFrames && $i > 0) {
+                
+                $tmpImg = imagecreate($this->gifWidth, $this->gifHeight);
+                imagecopy($tmpImg, $this->frames[0]['image'], 0, 0, 0, 0, $this->gifWidth, $this->gifHeight);
+                imagecopy($tmpImg, $img, 0, 0, 0, 0, $this->gifWidth, $this->gifHeight);
+                $img = $tmpImg;
+            }
+            
+            $this->frameImages[$i] = $this->frames[$i]['image'] = $img;
+        }
     }
     
     // Internals
     // ===================================================================================
     
     /**
-     * Parse frame data (old: parse_image_data)
+     * Parse the frame informations contained in the GIF file
+     * 
+     * @param string $filename GIF filename path
+     */
+    private function parseFramesInfo($filename)
+    {
+        $this->openFile($filename);
+        $this->parseGifHeader();
+        $this->parseGraphicsExtension(0);
+        $this->getApplicationData();
+        $this->getApplicationData();
+        $this->getFrameString(0);
+        $this->parseGraphicsExtension(1);
+        $this->getCommentData();
+        $this->getApplicationData();
+        $this->getFrameString(1);
+        
+        while (!$this->checkByte(0x3b) && !$this->checkEOF()) {
+            
+            $this->getCommentData(1);
+            $this->parseGraphicsExtension(2);
+            $this->getFrameString(2);
+        }
+    }
+    
+    /** 
+     * Parse the gif header (old: get_gif_header)
+     */
+    private function parseGifHeader()
+    {
+        $this->pointerForward(10);
+        
+        if ($this->readBits(($mybyte = $this->readByteInt()), 0, 1) == 1) {
+            
+            $this->pointerForward(2);
+            $this->pointerForward(pow(2, $this->readBits($mybyte, 5, 3) + 1) * 3);
+            
+        } else {
+            
+            $this->pointerForward(2);
+        }
+
+        $this->fileHeader["gifheader"] = $this->dataPart(0, $this->pointer);
+        
+        // Decoding
+        $this->orgvars["gifheader"] = $this->fileHeader["gifheader"];
+        $this->orgvars["background_color"] = $this->orgvars["gifheader"][11];
+    }
+    
+    /**
+     * Parse the application data of the frames (old: get_application_data)
+     */
+    private function getApplicationData()
+    {
+        $startdata = $this->readByte(2);
+        
+        if ($startdata == chr(0x21).chr(0xff)) {
+            
+            $start = $this->pointer - 2;
+            $this->pointerForward($this->readByteInt());
+            $this->readDataStream($this->readByteInt());
+            $this->fileHeader["applicationdata"] = $this->dataPart($start, $this->pointer - $start);
+            
+        } else {
+            
+            $this->pointerRewind(2);
+        }
+    }
+    
+    /**
+     * Parse the comment data of the frames (old: get_comment_data)
+     */
+    private function getCommentData()
+    {
+        $startdata = $this->readByte(2);
+        
+        if ($startdata == chr(0x21).chr(0xfe)) {
+            
+            $start = $this->pointer - 2;
+            $this->readDataStream($this->readByteInt());
+            $this->fileHeader["commentdata"] = $this->dataPart($start, $this->pointer - $start);
+            
+        } else {
+            
+            $this->pointerRewind(2);
+        }
+    }
+    
+    /**
+     * Parse the graphic extension of the frames (old: get_graphics_extension)
+     * 
+     * @param integer $type
+     */
+    private function parseGraphicsExtension($type)
+    {
+        $startdata = $this->readByte(2);
+        
+        if ($startdata == chr(0x21).chr(0xf9)) {
+            
+            $start = $this->pointer - 2;
+            $this->pointerForward($this->readByteInt());
+            $this->pointerForward(1);
+            
+            if ($type == 2) {
+                
+                $this->frameSources[$this->frameNumber]["graphicsextension"] = $this->dataPart($start, $this->pointer - $start);
+                
+            } elseif ($type == 1) {
+                
+                $this->orgvars["hasgx_type_1"] = 1;
+                $this->globaldata["graphicsextension"] = $this->dataPart($start, $this->pointer - $start);
+                
+            } elseif ($type == 0) {
+                
+                $this->orgvars["hasgx_type_0"] = 1;
+                $this->globaldata["graphicsextension_0"] = $this->dataPart($start, $this->pointer - $start);
+            }
+            
+        } else {
+            
+            $this->pointerRewind(2);
+        }
+    }
+    
+    /**
+     * Get the full frame string block (old: get_image_block)
+     * 
+     * @param integer $type
+     */
+    private function getFrameString($type)
+    {
+        if ($this->checkByte(0x2c)) {
+            
+            $start = $this->pointer;
+            $this->pointerForward(9);
+            
+            if ($this->readBits(($mybyte = $this->readByteInt()), 0, 1) == 1) {
+                
+                $this->pointerForward(pow(2, $this->readBits($mybyte, 5, 3) + 1) * 3);
+            }
+            
+            $this->pointerForward(1);
+            $this->readDataStream($this->readByteInt());
+            $this->frameSources[$this->frameNumber]["imagedata"] = $this->dataPart($start, $this->pointer - $start);
+
+            if ($type == 0) {
+                
+                $this->orgvars["hasgx_type_0"] = 0;
+                
+                if (isset($this->globaldata["graphicsextension_0"])) {
+                    
+                    $this->frameSources[$this->frameNumber]["graphicsextension"] = $this->globaldata["graphicsextension_0"];
+                    
+                } else {
+                    
+                    $this->frameSources[$this->frameNumber]["graphicsextension"] = null;
+                }
+                    
+                unset($this->globaldata["graphicsextension_0"]);
+                
+            } elseif ($type == 1) {
+                
+                if (isset($this->orgvars["hasgx_type_1"]) && $this->orgvars["hasgx_type_1"] == 1) {
+                    
+                    $this->orgvars["hasgx_type_1"] = 0;
+                    $this->frameSources[$this->frameNumber]["graphicsextension"] = $this->globaldata["graphicsextension"];
+                    unset($this->globaldata["graphicsextension"]);
+                    
+                } else {
+                    
+                    $this->orgvars["hasgx_type_0"] = 0;
+                    $this->frameSources[$this->frameNumber]["graphicsextension"] = $this->globaldata["graphicsextension_0"];
+                    unset($this->globaldata["graphicsextension_0"]);
+                }
+            }
+
+            $this->parseFrameData();
+            $this->frameNumber++;
+        }
+    }
+    
+    /**
+     * Parse frame data string into an array (old: parse_image_data)
      */
     private function parseFrameData()
     {
@@ -94,7 +340,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Get the image data byte (old: getImageDataByte)
+     * Get the image data byte (old: get_imagedata_byte)
      * 
      * @param string $type
      * @param integer $start
@@ -114,7 +360,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Get the image data bit
+     * Get the image data bit (old: get_imagedata_bit)
      * 
      * @param string $type
      * @param integer $byteIndex
@@ -135,7 +381,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Return the value of 2 ASCII chars (old: dualByteVal)
+     * Return the value of 2 ASCII chars (old: dualbyteval)
      * 
      * @param string $s
      * 
@@ -149,7 +395,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Read the data stream
+     * Read the data stream (old: read_data_stream)
      * 
      * @param integer $firstLength
      */
@@ -169,7 +415,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Open the gif file
+     * Open the gif file (old: loadfile)
      * 
      * @param string $filename
      */
@@ -177,10 +423,14 @@ class GifFrameExtractor
     {
         $this->handle = fopen($filename, "rb");
         $this->pointer = 0;
+        
+        $imageSize = getimagesize($filename);
+        $this->gifWidth = $imageSize[0];
+        $this->gifHeight = $imageSize[1];
     }
     
     /**
-     * Close the read gif file
+     * Close the read gif file (old: closefile)
      */
     private function closeFile()
     {
@@ -189,7 +439,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Read the file from the beginning to $byteCount in binary
+     * Read the file from the beginning to $byteCount in binary (old: readbyte)
      * 
      * @param integer $byteCount
      * 
@@ -204,7 +454,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Read a byte and return ASCII value
+     * Read a byte and return ASCII value (old: readbyte_int)
      * 
      * @return integer
      */
@@ -217,7 +467,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Convert a $byte to decimal
+     * Convert a $byte to decimal (old: readbits)
      * 
      * @param string $byte
      * @param integer $start
@@ -234,7 +484,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Rewind the file pointer reader
+     * Rewind the file pointer reader (old: p_rewind)
      * 
      * @param integer $length
      */
@@ -245,7 +495,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Forward the file pointer reader
+     * Forward the file pointer reader (old: p_forward)
      * 
      * @param integer $length
      */
@@ -256,7 +506,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Get a section of the data from $start to $start + $length
+     * Get a section of the data from $start to $start + $length (old: datapart)
      * 
      * @param integer $start
      * @param integer $length
@@ -273,7 +523,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Check if a character if a byte
+     * Check if a character if a byte (old: checkbyte)
      * 
      * @param integer $byte
      * 
@@ -293,7 +543,7 @@ class GifFrameExtractor
     }
     
     /**
-     * Check the end of the file
+     * Check the end of the file (old: checkEOF)
      * 
      * @return boolean
      */
@@ -307,5 +557,48 @@ class GifFrameExtractor
         fseek($this->handle, $this->pointer);
         
         return false;
+    }
+    
+    /**
+     * Reset and clear this current object
+     */
+    private function reset()
+    {
+        $this->gif = null;
+        $this->gifHeight = $this->gifWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
+        $this->frameImages = $this->frameDurations = $this->globaldata = $this->orgvars = $this->frames = $this->fileHeader = $this->frameSources = array();
+    }
+    
+    // Getter / Setter
+    // ===================================================================================
+    
+    /**
+     * Get the extracted frames (images and durations)
+     * 
+     * @return array
+     */
+    public function getFrames()
+    {
+        return $this->frames;
+    }
+    
+    /**
+     * Get the extracted frame images
+     * 
+     * @return array
+     */
+    public function getFrameImages()
+    {
+        return $this->frameImages;
+    }
+    
+    /**
+     * Get the extracted frame durations
+     * 
+     * @return array
+     */
+    public function getFrameDurations()
+    {
+        return $this->frameDurations;
     }
 }
