@@ -3,7 +3,7 @@
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version 1.1
+ * @version 1.2
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -75,6 +75,11 @@ class GifFrameExtractor
     /**
      * @var integer
      */
+    private $totalDuration;
+    
+    /**
+     * @var integer
+     */
     private $handle;
     
     /**
@@ -101,7 +106,11 @@ class GifFrameExtractor
      * @param boolean $originalFrames Get original frames (with transparent background)
      */
     public function extract($filename, $originalFrames = false)
-    { 
+    {
+        if (!self::isAnimatedGif($filename)) {
+            throw new \Exception('The GIF image you are trying to explode is not animated !');
+        }
+        
         $this->reset();
         $this->parseFramesInfo($filename);
         
@@ -134,6 +143,29 @@ class GifFrameExtractor
             
             $this->frameImages[$i] = $this->frames[$i]['image'] = $img;
         }
+    }
+    
+    /**
+     * Check if a GIF file at a path is animated or not
+     * 
+     * @param string $filename GIF path
+     */
+    public static function isAnimatedGif($filename)
+    {
+        if (!($fh = @fopen($filename, 'rb'))) {
+            return false;
+        }
+        
+        $count = 0;
+
+        while (!feof($fh) && $count < 2) {
+            
+            $chunk = fread($fh, 1024 * 100); //read 100kb at a time
+            $count += preg_match_all('#\x00\x21\xF9\x04.{4}\x00(\x2C|\x21)#s', $chunk, $matches);
+        }
+        
+        fclose($fh);
+        return $count > 1;
     }
     
     // Internals
@@ -330,6 +362,7 @@ class GifFrameExtractor
         $this->frameSources[$this->frameNumber]["user_input_flag"] = $this->getImageDataBit("ext", 3, 6, 1);
         $this->frameSources[$this->frameNumber]["transparent_color_flag"] = $this->getImageDataBit("ext", 3, 7, 1);
         $this->frameSources[$this->frameNumber]["delay_time"] = $this->dualByteVal($this->getImageDataByte("ext", 4, 2));
+        $this->totalDuration += (int) $this->frameSources[$this->frameNumber]["delay_time"];
         $this->frameSources[$this->frameNumber]["transparent_color_index"] = ord($this->getImageDataByte("ext", 6, 1));
         $this->frameSources[$this->frameNumber]["offset_left"] = $this->dualByteVal($this->getImageDataByte("dat", 1, 2));
         $this->frameSources[$this->frameNumber]["offset_top"] = $this->dualByteVal($this->getImageDataByte("dat", 3, 2));
@@ -589,12 +622,32 @@ class GifFrameExtractor
     private function reset()
     {
         $this->gif = null;
-        $this->gifMaxHeight = $this->gifMaxWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
+        $this->totalDuration = $this->gifMaxHeight = $this->gifMaxWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
         $this->frameImages = $this->frameDurations = $this->globaldata = $this->orgvars = $this->frames = $this->fileHeader = $this->frameSources = array();
     }
     
     // Getter / Setter
     // ===================================================================================
+    
+    /**
+     * Get the total of all added frame duration
+     * 
+     * @return integer
+     */
+    public function getTotalDuration()
+    {
+        return $this->totalDuration;
+    }
+    
+    /**
+     * Get the number of extracted frames
+     * 
+     * @return integer
+     */
+    public function getFrameNumber()
+    {
+        return $this->frameNumber;
+    }
     
     /**
      * Get the extracted frames (images and durations)

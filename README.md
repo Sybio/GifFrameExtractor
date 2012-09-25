@@ -16,8 +16,15 @@ GifFrameExtractor is really easy to use:
 **1 - Extraction:**
 
 ```php
-$gfe = new GifFrameExtractor();
-$gfe->extract('path/images/picture.gif');
+$gifFilePath = 'path/images/picture.gif';
+
+if (GifFrameExtractor::isAnimatedGif($gifFilePath)) { // check this is an animated GIF
+    
+    $gfe = new GifFrameExtractor();
+    $gfe->extract($gifFilePath);
+    
+    // Do something with extracted frames ...
+}
 ```
 
 **2 - Getting the frames and their duration:**
@@ -38,6 +45,13 @@ You can also get separately an array of images and an array of durations:
 ```php
 $frameImages = $gfe->getFrameImages();
 $frameDurations = $gfe->getFrameDurations();
+```
+
+And obtain usefull informations:
+
+```php
+$totalDuration = $gfe->getTotalDuration(); // Total duration of the animated GIF
+$frameNumber = $gfe->getFrameNumber(); // Number of extracted frames
 ```
 
 **Option:**
