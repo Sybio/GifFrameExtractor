@@ -67,4 +67,4 @@ This option is false by default.
 
 ### About
 
-The class reuse some part of code of "PHP GIF Animation Resizer" by Taha PAKSU (thanks to him).
+The class reuses some part of code of "PHP GIF Animation Resizer" by Taha PAKSU (thanks to him).
