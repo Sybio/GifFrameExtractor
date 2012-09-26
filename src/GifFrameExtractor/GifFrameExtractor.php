@@ -3,7 +3,7 @@
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version 1.3
+ * @version 1.4
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -123,7 +123,8 @@ class GifFrameExtractor
         
         $this->reset();
         $this->parseFramesInfo($filename);
-
+        $prevImg = null;
+        
         for ($i = 0; $i < count($this->frameSources); $i++) {
             
             $this->frames[$i] = array();
@@ -131,24 +132,34 @@ class GifFrameExtractor
             
             $img = imagecreatefromstring($this->fileHeader["gifheader"].$this->frameSources[$i]["graphicsextension"].$this->frameSources[$i]["imagedata"].chr(0x3b));
             
-            if (!$originalFrames && $i > 0) {
+            if (!$originalFrames) {
                 
-                $sprite = imagecreatetruecolor($this->gifMaxWidth, $this->gifMaxHeight);	
-                $trans = imagecolortransparent($sprite);
-                imagealphablending($sprite, false);
-                imagesavealpha($sprite, true);
-                imagepalettecopy($sprite, $img);		
-                			
-                imagefill($sprite, 0, 0, imagecolortransparent($img));
-                imagecolortransparent($sprite, imagecolortransparent($img));	
-                
-                if ((int) $this->frameSources[$i]['disposal_method'] == 1) {
+                if ($i > 0) {
                     
-                    imagecopy($sprite, $this->frames[$i - 1]['image'], 0, 0, -$this->frameSources[$i - 1]["offset_left"], -$this->frameSources[$i - 1]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
+                    $prevImg = $this->frames[$i - 1]['image'];
+                    
+                } else {
+                    
+                    $prevImg = $img;
                 }
                 
-                imagecopy($sprite, $img, 0, 0, -$this->frameSources[$i]["offset_left"], -$this->frameSources[$i]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
+                $sprite = imagecreate($this->gifMaxWidth, $this->gifMaxHeight);
+                imagesavealpha($sprite, true);
                 
+                $transparent = imagecolortransparent($prevImg);
+                
+                if ($transparent > -1 && imagecolorstotal($prevImg) > $transparent) {
+                    
+                    $actualTrans = imagecolorsforindex($prevImg, $transparent);
+                    imagecolortransparent($sprite, imagecolorallocate($sprite, $actualTrans['red'], $actualTrans['green'], $actualTrans['blue']));
+                }
+                
+                if ((int) $this->frameSources[$i]['disposal_method'] == 1 && $i > 0) {
+                    
+                    imagecopy($sprite, $prevImg, 0, 0, 0, 0, $this->gifMaxWidth, $this->gifMaxHeight);
+                }
+                
+                imagecopyresampled($sprite, $img, $this->frameSources[$i]["offset_left"], $this->frameSources[$i]["offset_top"], 0, 0, $this->gifMaxWidth, $this->gifMaxHeight, $this->gifMaxWidth, $this->gifMaxHeight);
                 $img = $sprite;
             }
             
