@@ -3,7 +3,7 @@
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version 1.2
+ * @version 1.3
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -33,6 +33,16 @@ class GifFrameExtractor
      * @var array
      */
     private $frameImages;
+    
+    /**
+     * @var array
+     */
+    private $framePositions;
+    
+    /**
+     * @var array
+     */
+    private $frameDimensions;
     
     /**
      * @var integer 
@@ -113,7 +123,7 @@ class GifFrameExtractor
         
         $this->reset();
         $this->parseFramesInfo($filename);
-        
+
         for ($i = 0; $i < count($this->frameSources); $i++) {
             
             $this->frames[$i] = array();
@@ -121,7 +131,7 @@ class GifFrameExtractor
             
             $img = imagecreatefromstring($this->fileHeader["gifheader"].$this->frameSources[$i]["graphicsextension"].$this->frameSources[$i]["imagedata"].chr(0x3b));
             
-            if (!$originalFrames) {
+            if (!$originalFrames && $i > 0) {
                 
                 $sprite = imagecreatetruecolor($this->gifMaxWidth, $this->gifMaxHeight);	
                 $trans = imagecolortransparent($sprite);
@@ -132,12 +142,13 @@ class GifFrameExtractor
                 imagefill($sprite, 0, 0, imagecolortransparent($img));
                 imagecolortransparent($sprite, imagecolortransparent($img));	
                 
-                if ($i > 0) {
+                if ((int) $this->frameSources[$i]['disposal_method'] == 1) {
                     
                     imagecopy($sprite, $this->frames[$i - 1]['image'], 0, 0, -$this->frameSources[$i - 1]["offset_left"], -$this->frameSources[$i - 1]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
                 }
                 
                 imagecopy($sprite, $img, 0, 0, -$this->frameSources[$i]["offset_left"], -$this->frameSources[$i]["offset_top"], $this->gifMaxWidth, $this->gifMaxHeight);
+                
                 $img = $sprite;
             }
             
@@ -194,6 +205,7 @@ class GifFrameExtractor
             $this->getCommentData(1);
             $this->parseGraphicsExtension(2);
             $this->getFrameString(2);
+            $this->getApplicationData();
         }
     }
     
@@ -375,6 +387,16 @@ class GifFrameExtractor
         $this->frameSources[$this->frameNumber]["color_table"] = substr($this->frameSources[$this->frameNumber]["imagedata"], 10, $this->frameSources[$this->frameNumber]["color_table_size"]);
         $this->frameSources[$this->frameNumber]["lzw_code_size"] = ord($this->getImageDataByte("dat", 10, 1));
         
+        $this->framePositions[$this->frameNumber] = array(
+            'x' => $this->frameSources[$this->frameNumber]["offset_left"],
+            'y' => $this->frameSources[$this->frameNumber]["offset_top"],
+        );
+        
+        $this->frameDimensions[$this->frameNumber] = array(
+            'width' => $this->frameSources[$this->frameNumber]["width"],
+            'height' => $this->frameSources[$this->frameNumber]["height"],
+        );
+                
         // Decoding
         $this->orgvars[$this->frameNumber]["transparent_color_flag"] = $this->frameSources[$this->frameNumber]["transparent_color_flag"];
         $this->orgvars[$this->frameNumber]["transparent_color_index"] = $this->frameSources[$this->frameNumber]["transparent_color_index"];
@@ -623,7 +645,7 @@ class GifFrameExtractor
     {
         $this->gif = null;
         $this->totalDuration = $this->gifMaxHeight = $this->gifMaxWidth = $this->handle = $this->pointer = $this->frameNumber = 0;
-        $this->frameImages = $this->frameDurations = $this->globaldata = $this->orgvars = $this->frames = $this->fileHeader = $this->frameSources = array();
+        $this->frameDimensions = $this->framePositions = $this->frameImages = $this->frameDurations = $this->globaldata = $this->orgvars = $this->frames = $this->fileHeader = $this->frameSources = array();
     }
     
     // Getter / Setter
@@ -657,6 +679,26 @@ class GifFrameExtractor
     public function getFrames()
     {
         return $this->frames;
+    }
+    
+    /**
+     * Get the extracted frame positions
+     * 
+     * @return array
+     */
+    public function getFramePositions()
+    {
+        return $this->framePositions;
+    }
+    
+    /**
+     * Get the extracted frame dimensions
+     * 
+     * @return array
+     */
+    public function getFrameDimensions()
+    {
+        return $this->frameDimensions;
     }
     
     /**
