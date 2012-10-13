@@ -1,9 +1,11 @@
 <?php
 
+namespace GifFrameExtractor;
+
 /**
  * Extract the frames (and their duration) of a GIF
  * 
- * @version 1.4
+ * @version 1.5
  * @link https://github.com/Sybio/GifFrameExtractor
  * @author Sybio (Clément Guillemain  / @Sybio01)
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
@@ -114,6 +116,8 @@ class GifFrameExtractor
      * 
      * @param string $filename GIF filename path
      * @param boolean $originalFrames Get original frames (with transparent background)
+     * 
+     * @return array
      */
     public function extract($filename, $originalFrames = false)
     {
@@ -165,6 +169,8 @@ class GifFrameExtractor
             
             $this->frameImages[$i] = $this->frames[$i]['image'] = $img;
         }
+        
+        return $this->frames;
     }
     
     /**
