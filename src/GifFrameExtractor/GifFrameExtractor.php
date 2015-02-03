@@ -90,11 +90,6 @@ class GifFrameExtractor
      */
     private $totalDuration;
 
-    /**
-     * @var integer
-     */
-    private $adjustedTotalDuration;
-
     /*
      * @var integer
      */
@@ -422,7 +417,6 @@ class GifFrameExtractor
         $this->frameSources[$this->frameNumber]["transparent_color_flag"] = $this->getImageDataBit("ext", 3, 7, 1);
         $this->frameSources[$this->frameNumber]["delay_time"] = $this->dualByteVal($this->getImageDataByte("ext", 4, 2));
         $this->totalDuration += (int) $this->frameSources[$this->frameNumber]["delay_time"];
-        $this->adjustedTotalDuration += $this->frameSources[$this->frameNumber]["delay_time"] == 0 ? 10 : (int) $this->frameSources[$this->frameNumber]["delay_time"];
         $this->frameSources[$this->frameNumber]["transparent_color_index"] = ord($this->getImageDataByte("ext", 6, 1));
         $this->frameSources[$this->frameNumber]["offset_left"] = $this->dualByteVal($this->getImageDataByte("dat", 1, 2));
         $this->frameSources[$this->frameNumber]["offset_top"] = $this->dualByteVal($this->getImageDataByte("dat", 3, 2));
@@ -709,23 +703,11 @@ class GifFrameExtractor
     }
 
     /**
-     * Get the total of all added frame duration.
-     * Frames with 0 delay are calculated with 1/10 second
-     * of delay.
-     *
-     * @return integer
-     */
-    public function getAdjustedTotalDuration()
-    {
-        return $this->adjustedTotalDuration;
-    }
-
-    /**
      * Get the number of loops (0 for infinite loops)
      *
      * @return integer
      */
-    public function getLoopCount()
+    public function getLoopNumber()
     {
         return $this->loopCount;
     }
