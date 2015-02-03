@@ -93,7 +93,7 @@ class GifFrameExtractor
     /*
      * @var integer
      */
-    private $loopCount;
+    private $loopNumber;
 
     /**
      * @var integer
@@ -275,8 +275,8 @@ class GifFrameExtractor
 
                 if ($startLoopSubData == chr(0x03).chr(0x01)) {
 
-                    $loopCountPack = unpack('v*', $this->readByte(2));
-                    $this->loopCount = $loopCountPack[1];
+                    $loopNumberPack = unpack('v*', $this->readByte(2));
+                    $this->loopNumber = $loopNumberPack[1];
 
                     $this->pointerRewind(4);
 
@@ -709,7 +709,7 @@ class GifFrameExtractor
      */
     public function getLoopNumber()
     {
-        return $this->loopCount;
+        return $this->loopNumber;
     }
 
     /**
