@@ -51,6 +51,7 @@ And obtain usefull informations:
 
 ```php
 $totalDuration = $gfe->getTotalDuration(); // Total duration of the animated GIF
+$loopNumber = $gfe->getLoopNumber(); // Number of loops of the animated GIF
 $frameNumber = $gfe->getFrameNumber(); // Number of extracted frames
 var_dump($gfe->getFrameDimensions()); // An array containing the dimension of each extracted frame
 var_dump($gfe->getFramePositions()); // An array containing the original positions of each extracted frame inside the GIF
