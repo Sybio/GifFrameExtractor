@@ -141,30 +141,32 @@ class GifFrameExtractor
                 if ($i > 0) {
                     
                     $prevImg = $this->frames[$i - 1]['image'];
+                    $sprite = imagecreate($this->gifMaxWidth, $this->gifMaxHeight);
+                    imagesavealpha($sprite, true);
                     
+                    $transparent = imagecolortransparent($prevImg);
+                    
+                    if ($transparent > -1 && imagecolorstotal($prevImg) > $transparent) {
+                    
+                        $actualTrans = imagecolorsforindex($prevImg, $transparent);
+                        imagecolortransparent($sprite, imagecolorallocate($sprite, $actualTrans['red'], $actualTrans['green'], $actualTrans['blue']));
+                    }
+                    
+                    if ((int) $this->frameSources[$i]['disposal_method'] == 1 && $i > 0) {
+                        
+                        imagecopy($sprite, $prevImg, 0, 0, 0, 0, $this->gifMaxWidth, $this->gifMaxHeight);
+                    }
+                    $w = imagesx($img);
+                    $h = imagesy($img);
+                    imagecopyresampled($sprite, $img, $this->frameSources[$i]["offset_left"], $this->frameSources[$i]["offset_top"], 0, 0, $w, $h, $w, $h);
+                    $img = $sprite;
+
                 } else {
                     
                     $prevImg = $img;
                 }
                 
-                $sprite = imagecreate($this->gifMaxWidth, $this->gifMaxHeight);
-                imagesavealpha($sprite, true);
-                
-                $transparent = imagecolortransparent($prevImg);
-                
-                if ($transparent > -1 && imagecolorstotal($prevImg) > $transparent) {
-                    
-                    $actualTrans = imagecolorsforindex($prevImg, $transparent);
-                    imagecolortransparent($sprite, imagecolorallocate($sprite, $actualTrans['red'], $actualTrans['green'], $actualTrans['blue']));
-                }
-                
-                if ((int) $this->frameSources[$i]['disposal_method'] == 1 && $i > 0) {
-                    
-                    imagecopy($sprite, $prevImg, 0, 0, 0, 0, $this->gifMaxWidth, $this->gifMaxHeight);
-                }
-                
-                imagecopyresampled($sprite, $img, $this->frameSources[$i]["offset_left"], $this->frameSources[$i]["offset_top"], 0, 0, $this->gifMaxWidth, $this->gifMaxHeight, $this->gifMaxWidth, $this->gifMaxHeight);
-                $img = $sprite;
+
             }
             
             $this->frameImages[$i] = $this->frames[$i]['image'] = $img;
